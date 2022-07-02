@@ -11,7 +11,7 @@
 
 /**
  * ** Please note ** - this is a work in progress, see : https://www.innerwebblueprint.com/blog/innerweb-monolog/a-work-in-progress-learning-to-iterate/
- * Contributions, critcisim, suggestion on how to improve or do things better are MORE than welcomed, they are encourage. I'm still learning and working to imporve! 
+ * Contributions, critcisim, suggestion on how to improve or do things better are MORE than welcomed, they are encourage. I'm still learning and working to improve! 
  * On with the show!
  */
 
