@@ -19,7 +19,8 @@
  * If the process fails at any point, we notify the user what to do next with an error message.
  * 
  * Again, ** please note ** - this is a work in progress, see : https://www.innerwebblueprint.com/blog/innerweb-monolog/a-work-in-progress-learning-to-iterate/
- * Contributions, critcisim, suggestion on how to improve or do things better are MORE than welcomed, they are encourage. Please, I'm still learning and want to imporve! On with the show!
+ * Contributions, critcisim, suggestion on how to improve or do things better are MORE than welcomed, they are encourage. I'm still learning and want to imporve! 
+ * On with the show!
  */
 
 /**
