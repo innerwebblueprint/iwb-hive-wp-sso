@@ -25,6 +25,7 @@
  */
 require 'includes/iwb-sso-activate.php';
 require 'includes/iwb-sso-deactivate.php';
+//require 'includes/iwb-sso-verify_signature.php';
 
 /**
  * Define some shorter plugin path constants
