@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: IWB WP HIVE SSO
+ * Plugin Name: IWB HIVE WP SSO
  * Plugin URI: http://www.innerwebblueprint.com/projects/wpplugins/iwb-hive-wp-sso
  * Description: Sign in to Wordpress with your Hive account.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: @innwerwebbp www.InnerWebBlueprint.com
  * License: MIT
  * License URI: https://www.innerwebblueprint.com/license/mit
@@ -15,6 +15,13 @@
  * On with the show!
  */
 
+/**
+ * This is a composer thing...
+ * It includes all the dependencies defined by composer.
+ * Currently that's only Tuupola\Base58
+ */
+require 'vendor/autoload.php';
+
  /**
  * Wordpress has lots of 'hooks' you can 'hook' into to run specific code
  * at specific times in the Wordpress 'processes'.
@@ -25,7 +32,11 @@
  */
 require 'includes/iwb-sso-activate.php';
 require 'includes/iwb-sso-deactivate.php';
-//require 'includes/iwb-sso-verify_signature.php';
+
+/**
+ * 
+ */
+require 'includes/iwb-sso-verify_signature.php';
 
 /**
  * Define some shorter plugin path constants
@@ -35,12 +46,17 @@ require 'includes/iwb-sso-deactivate.php';
 define( 'IWBSSO_DIR', plugin_dir_path( __FILE__ ) );
 define( 'IWBSSO_URL', plugin_dir_url( __FILE__ ) );
 
+/**
+ * as of 1.1.0 I am verifying the signature natively in php
+ * will remove this later.
+ */
 // Should this be a constant?
 // Python script for signature validation
-$iwb_sso_PyScript = plugin_dir_path( __FILE__ ) .'/includes/py/iwbpy.py';
+// $iwb_sso_PyScript = plugin_dir_path( __FILE__ ) .'/includes/py/iwbpy.py';
 
-// This will eventually be configurable as a setting
+// These will eventually be configurable as configurable settings
 $iwb_sso_Message = 'Signing this message confirms you are who you say you are. Please confirm this dialog to sign this message and authorize your login. Message number: ';
+$iwb_sso_ButtonText = 'Login With Your Hive Account';
 
 /**
  * Enqueue iwbsso-login.js to handle the login with hive button press 
@@ -57,6 +73,21 @@ function iwb_sso_enqueue_scripts () {
         $ver = "1.0.0",
         $in_footer = false 
     );
+    /**
+     * Add some data to our enqueued script. This is 'the wordpress way' as I 
+     * understand it.
+     * 
+     * I am adding three things here:
+     * 1. the Ajax URL for a front end request (that means 'wordpress front end' or non admin pages). 
+     *      It's apparently only defined by default on the 'admin pages'.
+     * 2. a unique number only used once wp_nonce
+     * 3. The message that a user will sign to authenticate their login.
+     * 
+     * Too see these in the Browser using Javascript:
+     * console.log( iwb_sso_data.ajaxUrl );
+     * console.log( iwb_sso_data.signMessage );
+     * console.log( iwb_sso_data.wp_nonce )
+     */
 
     $iwb_sso_wpnonce = wp_create_nonce( 'iwb_sso_wp_login_nonce');
     $iwb_sso_data= array(
@@ -67,22 +98,7 @@ function iwb_sso_enqueue_scripts () {
     $iwb_sso_data = json_encode($iwb_sso_data);
     // wp_localize_script( 'iwb_sso_login', 'iwb_sso_data', $iwb_sso_data );
     wp_add_inline_script( 'iwb_sso_login', 'const iwb_sso_data = ' . $iwb_sso_data, 'before' );
-    // Why isn't this working?
 
-    /**
-     * Add some data to our enqueued script. This is 'the wordpress way' as I 
-     * understand it.
-     * 
-     * I am adding two things here:
-     * 1. the Ajax URL for a front end request. 
-     *      It's apparently only defined by default on the 'admin pages'.
-     * 2. The message that a user will sign to authenticate their login.
-     * 
-     * Too see these in the Browser using Javascript:
-     * console.log( iwb_sso_data.ajaxUrl );
-     * console.log( iwb_sso_data.signMessage );
-     * console.log( iwb_sso_data.wp_nonce )
-     */
 }
 
 /**
@@ -91,11 +107,12 @@ function iwb_sso_enqueue_scripts () {
  * 
  */
 function iwb_sso_add_login_button(){
+    global $iwb_sso_ButtonText;
     iwb_sso_enqueue_scripts();
      ?>
      <div>
-         <center><button class="button button-primary button-large" style="float: none;" onclick="iwb_sso_login_button_click()" type="button" id="buttonText" ><?php echo 'Login With Your Hive Account'; ?></button></center>
-		 <center><a href="what-is-hive/" style="padding-bottom: 15px;">What Is Hive?</a></center><br/>
+         <center><button class="button button-primary button-large" style="float: none; background-color: green; font-weight: bold;" onclick="iwb_sso_login_button_click()" type="button" id="buttonText" ><?php echo $iwb_sso_ButtonText; ?></button></center>
+         <br/>
      </div>        
     <?php
 }
@@ -103,17 +120,16 @@ add_action( 'login_form', 'iwb_sso_add_login_button');
 
 /**
  * Here I am telling wordpress what to do with the ajax call with
- * a signed login message... call iwb_sso_handle_login_request() for both
+ * the signed login message... call iwb_sso_handle_login_request() for both
  * privedleged requests and non priveleged requests.
  */
 add_action('wp_ajax_nopriv_iwb_sso_handle_login_request','iwb_sso_handle_login_request');
 add_action('wp_ajax_iwb_sso_handle_login_request', 'iwb_sso_handle_login_request');
 
-
 /**
  * iwb_sso_get_publickey ();
  * Get the usernames public key from the hive blockchain
- * We have this from their assertaion, but we need to make sure
+ * We have this from their assertion, but we need to make sure
  * it's valid by checking it against the source...
  * The Hive blockchain is the definitive source.
 */
@@ -131,7 +147,6 @@ function iwb_sso_get_publickey ($iwb_sso_HiveUsername) {
   $iwb_sso_CallData = json_encode(array(
     "jsonrpc" => "2.0",
     "method" => "condenser_api.lookup_account_names",
-    // I'm not sure this line will work below...
     "params" => array(
       ["$iwb_sso_HiveUsername"]
       ),
@@ -167,6 +182,9 @@ function iwb_sso_get_publickey ($iwb_sso_HiveUsername) {
 }
 
 /**
+ * as of 1.1.0 I am verifying the signature natively in php
+ * will remove this later.
+ * 
  * iwb_sso_validate_signature()
  * So I am cheating here and doing this in python instead of php.
  * That requires the beempy python library by (name?)
@@ -176,16 +194,16 @@ function iwb_sso_get_publickey ($iwb_sso_HiveUsername) {
  * I have the required python libraries built in to the 
  * IWB docker wordpress image, so as long as your using that, this will work.
  */
-function iwb_sso_validate_signature($message,$publicKey,$signature) {
-    global $iwb_sso_PyScript;
+// function iwb_sso_validate_signature($message,$publicKey,$signature) {
+//     global $iwb_sso_PyScript;
     
-    $shellCommandArgs = '"'. $message. '" "'. $publicKey. '" "'. $signature. '"';
-    $shellCommand = $iwb_sso_PyScript;
+//     $shellCommandArgs = '"'. $message. '" "'. $publicKey. '" "'. $signature. '"';
+//     $shellCommand = $iwb_sso_PyScript;
 
-    $output = shell_exec($shellCommand. ' '. $shellCommandArgs);
-    //echo "$testOutput";
-    return $output;
-}
+//     $output = shell_exec($shellCommand. ' '. $shellCommandArgs);
+//     //echo "$testOutput";
+//     return $output;
+// }
   
 /**
  * iwb_sso_handle_login_request()
@@ -193,36 +211,70 @@ function iwb_sso_validate_signature($message,$publicKey,$signature) {
  */
 function iwb_sso_handle_login_request() {
   global $iwb_sso_Message;
+
     // _ajax_nonce: iwb_sso_data.wp_nonce,
     // action: "iwb_sso_handle_login_request", // action
     // iwb_sso_HiveUsername: callbackResponse.data.username,
     // iwb_sso_Message: callbackResponse.data.message,
     // iwb_sso_MessageSignature: callbackResponse.result,
     // iwb_sso_HivePublicKey: callbackResponse.publicKey
-    
-  
+
   // Verify our wp nonce
-    check_ajax_referer( 'iwb_sso_wp_login_nonce' );
-    // Assign variables from the post data
-    $iwb_sso_HiveUsername = isset($_REQUEST['iwb_sso_HiveUsername'])?sanitize_text_field( wp_unslash( $_REQUEST['iwb_sso_HiveUsername'] ) ):'';
+  check_ajax_referer( 'iwb_sso_wp_login_nonce' );
+
+  // Assign variables from the post data
+  $iwb_sso_wpnonce = isset($_REQUEST['_ajax_nonce'])?sanitize_text_field( wp_unslash( $_REQUEST['_ajax_nonce'] ) ):'';
+
+  $iwb_sso_HiveUsername = isset($_REQUEST['iwb_sso_HiveUsername'])?sanitize_text_field( wp_unslash( $_REQUEST['iwb_sso_HiveUsername'] ) ):'';
     
-    //Not sure if I need to remove the sanitize here or the unslask
-    //Let's try it like this and see what happens.
-    $iwb_sso_MessageSignature = isset($_REQUEST['iwb_sso_MessageSignature'])?sanitize_text_field( wp_unslash( $_REQUEST['iwb_sso_MessageSignature'] ) ):'';
+  $iwb_sso_MessageSignature = isset($_REQUEST['iwb_sso_MessageSignature'])?sanitize_text_field( wp_unslash( $_REQUEST['iwb_sso_MessageSignature'] ) ):'';
 
-    $iwb_sso_Message = isset($_REQUEST['iwb_sso_Message'])?sanitize_text_field( wp_unslash( $_REQUEST['iwb_sso_Message'] ) ):'';
-        
-    // Get the Users 'admin' public key from the chain by name
-    $iwb_sso_ValidPublicKey = iwb_sso_get_publickey($iwb_sso_HiveUsername);
+  $iwb_sso_ReportedMessage = isset($_REQUEST['iwb_sso_Message'])?sanitize_text_field( wp_unslash( $_REQUEST['iwb_sso_Message'] ) ):'';
 
-    // Pass the valid public key, the signature, and the message...
-    // to a function that verifies the signature is valid
-    $valid = iwb_sso_validate_signature($iwb_sso_Message,$iwb_sso_ValidPublicKey,$iwb_sso_MessageSignature);
+  //Construct our original message sent for signing.
+  $iwb_sso_OriginalMessage = $iwb_sso_Message . $iwb_sso_wpnonce;
+
+  // $response = array(
+  //   'nonce' => $iwb_sso_wpnonce,
+  //   'username' => $iwb_sso_HiveUsername,
+  //   'OriginalMessage' => $iwb_sso_OriginalMessage,
+  //   'ReportedMessage' => $iwb_sso_ReportedMessage
+  // );
+
+  // wp_send_json($response);
+  // wp_die();
+
+
+
+  //This should be the same as our original message. We check against the original message
+  //not the reported one for security reasons.
+  if ($iwb_sso_ReportedMessage != $iwb_sso_OriginalMessage) {
+    // maybe bail on the login with a message?
+    // These messages should be the same, but arn't... something is not right.
+    $response = array(
+      'nonce' => $iwb_sso_wpnonce,
+      'username' => $iwb_sso_HiveUsername,
+      'test'  => $iwb_sso_OriginalMessage,
+      'test2' => $iwb_sso_ReportedMessage
+    );
+
+    wp_send_json($response);
+    wp_die();
+
+  }
+
+  // Get the Users 'admin' public key from the chain by name
+  $iwb_sso_ValidPublicKey = iwb_sso_get_publickey($iwb_sso_HiveUsername);
+
+
+  // Pass the valid public key, the signature, and the original message sent for signing...
+  // to a function that verifies the signature is valid    
+  $valid = iwb_sso_verify_message_signature($iwb_sso_OriginalMessage,$iwb_sso_MessageSignature,$iwb_sso_ValidPublicKey);
 
     /**
      * If the signature is valid, proceed, otherwise return an error message 
      */
-     if ($valid = 'SUCCESS: signature matches pubkey')  {
+     if ($valid = 'true')  {
       // Log the user in to wordpress
       $user_name=$iwb_sso_HiveUsername;
       $user_email="";
