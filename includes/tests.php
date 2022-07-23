@@ -1,27 +1,33 @@
 <?php
 /**
  * includes/tests.php
- * File header...
- * @todo Is there some sort of standard for this?
- * This is a test file for iwb-sso-verify_signature.php
- * php path/tests.php
+ * This is a mostly self contained (runs outside of workdpress), test file for testing Hive signature verification.
+ * It does require the libraries noted below in dependencies in right locations. 
+ * This is a test file for iwb-sso-verify_signature.php, it is only a test file.
+ * to run: php path/tests.php
+ * 
+ * @todo Is there some sort of standard for header comments?
  */
 
+
 /**
- * This is a composer thing...
- * It includes all the dependencies defined by composer.
- * Currently that's only Tuupola\Base58
+ * Dependencies:
+ * I am using Composer, a php 'packaging/dependency' tool to manage and load libraries where I can.
+ * Currently that's only Tuupola\Base58, a Base58 encoding/decoding library.
+ * This is also dependent on a slimmed down ECC library, elliptic. There are no notes inside this library.
+ * but I got it from this WordPress plugin here: https://wordpress.org/plugins/web3-authentication/
+ * It's a slimmed down version of : https://github.com/simplito/elliptic-php/ , 
+ * which itself is a port of https://github.com/indutny/elliptic
+ * I'm not using composer for this library yet as it creates some version conflicts using the full elliptic-php
+ * So manual for now, it's included in the plugin files under lib.
  */
+
+// This is a composer thing...
+// but the path is altered so it will run, this is just a test file.
 require '../vendor/autoload.php';
 
 /**
- * Slimmed down ECC library
- * There are no notes on this library.
- * but I got it from here: https://wordpress.org/plugins/web3-authentication/
- * It's a slimmed down version of :
- * @todo get that link at put it here
- * I'm not using composer for this yet as it creates some version conflicts.
- * So manual for now.
+ * Custom includes outside of composer
  */
 require_once ('lib/Elliptic/EC.php');
 require_once ('lib/Elliptic/Curves.php');
@@ -71,12 +77,18 @@ function iwb_sso_verify_message_signature ($message, $signature, $hivePublicKey)
     $hexDecoded = bin2hex($decoded);
     var_dump($hexDecoded);
 
-    // Check if key is compressed (it probably is)
-    // if so, decompress and send to EC to derivce y
+    // Check if key is compressed
+    // Hive's keys are pretty much always compressed,
+    // See here for reference: https://github.com/holgern/beem/blob/master/beemgraphenebase/account.py 
+    // note:: By default, graphene-based networks deal with **compressed**
+    // public keys.
+
+    // if so, decompress and send to EC to derive y
     if (substr($hexDecoded,0,2)== '04') {
         color_red("not compressed");
         return $hexDecoded;
         // do something different here
+        // Hive's keys are pretty much always compressed
     } elseif (substr($hexDecoded,0,2) == '02'|'03') {
         color_red("compressed, let's uncompress \n");
         $hexDecoded = substr($hexDecoded,0,66);
@@ -84,8 +96,6 @@ function iwb_sso_verify_message_signature ($message, $signature, $hivePublicKey)
         //print_r($key);
         $test = $key->getPublic();
         print_r($test);
-        // $x = hex2String($test->getX());
-        // $y = hex2String($test->getY());
         // var_dump($test->getX());
         // var_dump($test->getY());
     }
@@ -99,103 +109,17 @@ function iwb_sso_verify_message_signature ($message, $signature, $hivePublicKey)
         "s" => substr($signature, 66, 64)
     ];
 
-    // I am manually setting the recovery parameter
-    //$recovery_parameter = ord(hex2bin(substr($signature, 130, 2))) - 28;
-    $recovery_parameter = 0;    
-
-    // very the message signature key against the formatted public key pair
+    // very the message signature key against the formatted public key pair using the ECC library's verify method.
     echo "Verified: " . (($key->verify($msgHash, $sig) == TRUE) ? "true" : "false") . "\n";
 
-    // Get the public key from the signature
+    // Still working on reconstructing the public key from the signature
     // $pubkey = $ec->recoverPubKey($msgHash, $sig, $recovery_parameter);
-
-    // formatting as a 'key pair'
-    // $key = $ec->keyFromPublic($pubkey, 'hex');
-    //var_dump($key);
-    // echo $pubkey->inspect();
-    //var_dump($pubkey->__debugInfo()) ;
-    
-    // we need to verify that the public key we are getting from the signature
-    // is the same as the key we looked up: $hivePublicKey
-
-    // I either need to 'form' the derived public key and check it against the 'given' public key verified by the block chain...
-    // or
-    // deconstruct the 'given' public key into it's 04 + x + y
-    // Let's learn how to do both...
-}
-
-function sample_ssl_verify ($message) {
-    /**
-     * https://stackoverflow.com/questions/53183043/need-help-understanding-php-signature-verification
-     * 
-     */
-
-    // $ssl_methods= openssl_get_md_methods();
-    // print_r ($ssl_methods);
-
-    $msg = $message;
-
-    // Verify signature (use the same algorithm used to sign the msg).
-    $result = openssl_verify($msg, base64_decode($signature), $key, OPENSSL_ALGO_SHA256);
-
-        if ($result == 1)
-    {
-        $result = "Verified";
-    }
-    elseif ($result == 0)
-    {
-        $result = "Unverified";
-    }
-    else
-    {
-        $result = "Unknown verification response";
-    }
-
-    // Get base64 encoded public key.
-    // NOTE: this is just for testing the code, final production code stores the public key in a db.
-    $pubkey = $_POST['pubkey'];
-
-    // Convert pubkey in to PEM format (don't forget the line breaks).
-    $pubkey_pem = "-----BEGIN PUBLIC KEY-----\n$pubkey\n-----END PUBLIC KEY-----";
-
-    // Get public key.
-    $key = openssl_pkey_get_public($pubkey_pem);
-
-    if ($key == 0)
-    {
-        $result = "Bad key zero.";
-    }
-    elseif ($key == false)
-    {
-        $result = "Bad key false.";
-    }
-    else
-    {
-        // Verify signature (use the same algorithm used to sign the msg).
-        $result = openssl_verify($msg, base64_decode($signature), $key, OPENSSL_ALGO_SHA256);
-
-        if ($result == 1)
-        {
-            $result = "Verified";
-        }
-        elseif ($result == 0)
-        {
-            $result = "Unverified";
-        }
-        else
-        {
-            $result = "Unknown verification response";
-        }
-        // do something with the result.
-    }
-    /**
-     * end of this testing code
-    * 
-    */
 }
 
 /**
  * My testing header
+ * This test script is intedned to be run from command line
+ * These make fancy colors on command line.
  */
 function my_testing_header () {
     system('clear');
@@ -219,6 +143,5 @@ function my_testing_footer () {
 function color_red($echo_text) {
     echo "\e[0;31m$echo_text\e[0m";
 }
-
 
 ?>
