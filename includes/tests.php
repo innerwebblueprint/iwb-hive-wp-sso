@@ -108,8 +108,12 @@ function iwb_sso_verify_message_signature ($message, $signature, $hivePublicKey)
         "r" => substr($signature, 2, 64),
         "s" => substr($signature, 66, 64)
     ];
+    color_red("Signature r, and s: \n");
+    var_dump($sig);
+    echo "\n";
 
     // very the message signature key against the formatted public key pair using the ECC library's verify method.
+    color_red("Is the signature verified: ");
     echo "Verified: " . (($key->verify($msgHash, $sig) == TRUE) ? "true" : "false") . "\n";
 
     // Still working on reconstructing the public key from the signature
