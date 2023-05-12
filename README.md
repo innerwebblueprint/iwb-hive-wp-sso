@@ -8,14 +8,6 @@ Currently this plugin is dependent on a specific python library, beempy, to veri
 
 If not, you will likely need to install the python bemmpy library to use this plugin. It is highly unlikely that any standard WordPress hosting will have this library available. This plugin will currently not work without it. In a future version (as soon as I figure out how) I plan to support signature verification natively in php so this plugin can be used across a broader spectrum without the python dependency.
 
-/**
- * ** Please note ** - this is a work in progress, see : https://www.innerwebblueprint.com/blog/innerweb-monolog/a-work-in-progress-learning-to-iterate/
- *
- * Contributions, critcisim, suggestion on how to improve, or do things better are MORE than welcomed, they are encourage. I'm still learning and working to improve!
- * On with the show!
- */
-
-
 You can read more about the plugin here:
 
 https://www.innerwebblueprint.com/category/roadmap/iwb-wordpress-plugins/
